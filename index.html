@@ -1,0 +1,347 @@
+<!-- StAuth10065: I Raj Patel, 000744572 certify that this material is my original work. No other person's work has been used without due acknowledgement. I have not made my work available to anyone else. -->
+<!-- 
+    Run generator.js file, after that run server.js file when both the files are running output is displayed on http://localhost:3000/
+ -->
+<html>
+
+<head>
+    <title>Vuex</title>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script> -->
+    <script src="https://unpkg.com/vuex@2.0.0"></script>
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <style>
+        .router-link-active {
+            color: red;
+        }
+
+        th {
+            color: white;
+            cursor: pointer;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        td {
+            background-color: #f9f9f9;
+        }
+
+        th,
+        td {
+            min-width: 120px;
+            padding: 10px 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app">
+        <div class="container">
+            <h1>Microbrewery's Brewing Process!</h1>
+            <nav class="navbar" style="background: lightgray;">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">Home</a>
+                </div>
+                <ul class="nav navbar-nav">
+                    <li>
+                        <router-link id="link" to="/all">All</router-link>
+                    </li>
+                    <li>
+                        <router-link id="link" to="/mashing">Mashing</router-link>
+                    </li>
+                    <li>
+                        <router-link id="link" to="/boiling">Boiling</router-link>
+                    </li>
+                    <li>
+                        <router-link id="link" to="/fermentation">Fermentation</router-link>
+                    </li>
+                </ul>
+            </nav>
+            <router-view></router-view>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="text/x-template" id="grid-template">
+        <table>
+          <thead>
+            <select v-model="selectedFilter">
+                <option selected disabled value="">Filter by Status</option>
+                <option value="valid">Valid</option>
+                <option value="warning">Warning</option>
+                <option value="error">Error</option>
+                <option value="">None</option>
+            </select>
+            <tr style="background-color: lightskyblue;">
+                <td>Status</td>
+                <td>Message</td>
+                <td>Date-Time</td>
+                <td>Channel</td>
+            </tr>
+          </thead>
+          <tbody>       
+            <tr v-for="entry in print">
+                <td>{{entry.status}}</td>
+                <td>{{entry.message}}</td>
+                <td>{{entry.datetime}}</td>
+                <td>{{entry.channel}}</td>
+            </tr>
+          </tbody>
+        </table>
+    </script>
+    <script>
+        let socket = io();
+
+        Vue.use(VueRouter)
+        Vue.use(Vuex)
+
+        const store = new Vuex.Store({
+            state: {
+                messagesList: [],
+                allList: [],
+                selectedStatus: ''
+            },
+            getters: {
+                getMashingMessages: state => {
+                    return state.allList.filter(message => message.channel == "mashing");
+                },
+                getBoilingMessages: state => {
+                    return state.allList.filter(message => message.channel == "boiling");
+                },
+                getFermentationMessages: state => {
+                    return state.allList.filter(message => message.channel == "fermentation");
+                },
+                getWarningMessages: state => {
+                    return state.allList.filter(message => message.status == "warning")
+                },
+                getErrorMessages: state => {
+                    return state.allList.filter(message => message.status == "error")
+                },
+                getValidMessages: state => {
+                    return state.allList.filter(message => message.status == "valid")
+                }
+            },
+            mutations: {
+                pushData(state) {
+                    socket.on('channel', function (messages) {
+                        state.messagesList = messages
+                    });
+                },
+                getAllData(state) {
+                    state.allList = []
+                    for (i in state.messagesList) {
+                        state.allList.unshift(state.messagesList[i])
+                    }
+                }
+            }
+        })
+
+        const AllRoute = {
+            template: '#grid-template',
+            props: {
+                background: '',
+            },
+            store,
+            data: function () {
+                return {
+                    selected: null
+                }
+            },
+            computed: {
+                print() {
+                    store.commit('pushData')
+                    store.commit('getAllData')
+                    var data = this.$store.state.allList
+                    switch (this.selectedFilter) {
+                        case "warning":
+                            return this.$store.getters.getWarningMessages
+                            break;
+                        case "error":
+                            return this.$store.getters.getErrorMessages
+                            break;
+                        case "valid":
+                            return this.$store.getters.getValidMessages
+                            break;
+                        default:
+                            return this.$store.state.allList
+                            break;
+                    }
+                },
+                selectedFilter: {
+                    get: function () {
+                        return this.selected;
+                    },
+                    // },
+                    set: function (value) {
+                        this.selected = value
+                    }
+                },
+            }
+        }
+
+        const Mashing = {
+            template: '#grid-template',
+            store,
+            data: function () {
+                return {
+                    selected: null
+                }
+            },
+            computed: {
+                print() {
+                    store.commit('pushData')
+                    store.commit('getAllData')
+                    if (this.selectedFilter != null && this.selectedFilter != "") {
+                        var list = this.$store.getters.getMashingMessages
+                        filterList = []
+                        for (i in list) {
+                            if (list[i].status == this.selectedFilter) {
+                                filterList.push(list[i])
+                            }
+                        }
+                        return filterList
+                    } else {
+                        return this.$store.getters.getMashingMessages
+                    }
+
+                },
+                selectedFilter: {
+                    get: function () {
+                        return this.selected;
+                    },
+                    // },
+                    set: function (value) {
+                        this.selected = value
+                    }
+                },
+            }
+        }
+
+        const Boiling = {
+            template: '#grid-template',
+            store,
+            data: function () {
+                return {
+                    selected: null
+                }
+            },
+            computed: {
+                print() {
+                    store.commit('pushData')
+                    store.commit('getAllData')
+                    if (this.selectedFilter != null && this.selectedFilter != "") {
+                        var list = this.$store.getters.getBoilingMessages
+                        filterList = []
+                        for (i in list) {
+                            if (list[i].status == this.selectedFilter) {
+                                filterList.push(list[i])
+                            }
+                        }
+                        return filterList
+                    } else {
+                        return this.$store.getters.getBoilingMessages
+                    }
+
+                },
+                selectedFilter: {
+                    get: function () {
+                        return this.selected;
+                    },
+                    // },
+                    set: function (value) {
+                        this.selected = value
+                    }
+                },
+            }
+        }
+
+        const Fermentation = {
+            template: '#grid-template',
+            store,
+            data: function () {
+                return {
+                    selected: null
+                }
+            },
+            computed: {
+                print() {
+                    store.commit('pushData')
+                    store.commit('getAllData')
+                    if (this.selectedFilter != null && this.selectedFilter != "") {
+                        var list = this.$store.getters.getFermentationMessages
+                        filterList = []
+                        for (i in list) {
+                            if (list[i].status == this.selectedFilter) {
+                                filterList.push(list[i])
+                            }
+                        }
+                        return filterList
+                    } else {
+                        return this.$store.getters.getFermentationMessages
+                    }
+
+                },
+                selectedFilter: {
+                    get: function () {
+                        return this.selected;
+                    },
+                    // },
+                    set: function (value) {
+                        this.selected = value
+                    }
+                },
+            }
+        }
+
+        const router = new VueRouter({
+            mode: 'history',
+            routes: [
+                {
+                    path: '/',
+                    redirect: '/all'
+                },
+                {
+                    path: '/all',
+                    name: 'AllRoute',
+                    component: AllRoute
+                },
+                {
+                    path: '/mashing',
+                    name: 'Mashing',
+                    component: Mashing
+                },
+                {
+                    path: '/boiling',
+                    name: 'Boiling',
+                    component: Boiling
+                },
+                {
+                    path: '/fermentation',
+                    name: 'Fermentation',
+                    component: Fermentation
+                }
+            ]
+        })
+
+        const app = new Vue({
+            el: '#app',
+            store,
+            data: {
+                selected: ''
+            },
+            router,
+            computed: {
+                getData: function () {
+                    store.commit('pushData')
+                }
+            }
+        })
+
+    </script>
+</body>
+</html>
